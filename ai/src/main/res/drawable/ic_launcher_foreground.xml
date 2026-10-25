@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- +PLUS AI: the +PLUS plus with a spark (on-device AI). Black on white; also the monochrome (themed) icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#000000"
+        android:pathData="M44,40 L56,40 L56,54 L70,54 L70,66 L56,66 L56,80 L44,80 L44,66 L30,66 L30,54 L44,54 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M74,22 Q76,32 86,34 Q76,36 74,46 Q72,36 62,34 Q72,32 74,22 Z" />
+</vector>

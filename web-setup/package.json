@@ -1,0 +1,6 @@
+{
+  "name": "plus-web-setup",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test test/*.test.mjs" }
+}

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- T5: the built-in add-on catalog link, https://host/path/index.json#sha256=<catalog key hash>; the owner can enter
+         another one when importing the key. Empty = no catalog until the owner enters one (the image keeps its apps).
+         Now: the GitHub staging catalog (Milestone 1); its key is replaced by the release key before release. -->
+    <string name="catalog_link" translatable="false">https://plus-for-grapheneos.github.io/catalog/index.json#sha256=8fed9c0c25b05e8c3c35faf7ff60e0d2b6ae80d65a1166af494598b36bdb50a7</string>
+    <!-- Plain http catalog links: development builds only. -->
+    <bool name="catalog_allow_http">false</bool>
+    <!-- Empty = releases.grapheneos.org, verified with the pinned GrapheneOS keys (res/raw/release_* stay empty). -->
+    <string name="release_url" translatable="false"></string>
+    <!-- Official GrapheneOS always has the Updater app that +PLUS replaces; only a source-build channel may lack it. -->
+    <bool name="release_allow_missing_updater">false</bool>
+</resources>

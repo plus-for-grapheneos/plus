@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Debug builds: the development catalog served from the build box on the LAN. -->
+    <string name="catalog_link" translatable="false">http://10.0.2.2:8800/index.json#sha256=f7ffa7cf4b270eb131a9ea36b139187cbb69c2207a711c6b73754ff6bffd13ae</string>
+    <bool name="catalog_allow_http">true</bool>
+    <!-- Debug and staging: our own GrapheneOS source build served from the box, verified with its keys
+         (res/raw/release_avb_pkmd, release_cert), so the dev phone keeps its data. -->
+    <string name="release_url" translatable="false">http://10.0.2.2:8800/os/</string>
+    <!-- Our source builds don't include GrapheneOS's Updater app. -->
+    <bool name="release_allow_missing_updater">true</bool>
+</resources>

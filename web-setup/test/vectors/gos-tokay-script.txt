@@ -1,0 +1,49 @@
+check-var product tokay
+check-var slot-count 2
+flash bootloader bootloader-tokay-ripcurrentpro-17.0-15819938.img other-slot
+toggle-active-slot
+reboot-bootloader
+flash bootloader bootloader-tokay-ripcurrentpro-17.0-15819938.img other-slot
+toggle-active-slot
+reboot-bootloader
+# size of partition splits depends on this value
+check-var max-download-size 0xf900000
+# layout of the super partition depends on the current slot, which is hardcoded to slot A
+run-cmd set_active:a
+check-var current-slot a
+flash radio radio-tokay-g5400c-260604-260807-b-16035863.img
+reboot-bootloader
+erase avb_custom_key
+flash avb_custom_key avb_pkmd.bin
+run-cmd oem uart disable
+erase fips
+erase dpm_a
+erase dpm_b
+check-requirements android-info.txt
+maybe-cancel-snapshot-update
+flash boot boot.img
+flash init_boot init_boot.img
+flash dtbo dtbo.img
+flash vendor_kernel_boot vendor_kernel_boot.img
+flash pvmfw pvmfw.img
+flash vendor_boot vendor_boot.img
+flash vbmeta vbmeta.img
+erase userdata
+erase metadata
+flash super super_1.img
+flash super super_2.img
+flash super super_3.img
+flash super super_4.img
+flash super super_5.img
+flash super super_6.img
+flash super super_7.img
+flash super super_8.img
+flash super super_9.img
+flash super super_10.img
+flash super super_11.img
+flash super super_12.img
+flash super super_13.img
+flash super super_14.img
+flash super super_15.img
+flash super super_16.img
+flash super super_17.img

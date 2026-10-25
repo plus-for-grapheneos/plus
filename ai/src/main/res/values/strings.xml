@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="perm_label">use on-device AI models</string>
+    <string name="perm_description">Run prompts on the language models installed in +PLUS AI, on this phone only.</string>
+    <!-- T5: the model catalog link, https://host/path/models.json#sha256=<catalog key hash> (the +PLUS catalog key).
+         Empty = no catalog (models can still be listed if already installed). -->
+    <string name="catalog_link" translatable="false">https://plus-for-grapheneos.github.io/catalog/models.json#sha256=8fed9c0c25b05e8c3c35faf7ff60e0d2b6ae80d65a1166af494598b36bdb50a7</string>
+    <bool name="catalog_allow_http">false</bool>
+</resources>

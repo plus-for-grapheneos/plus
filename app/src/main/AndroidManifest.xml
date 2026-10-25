@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- +PLUS for GrapheneOS. Not affiliated with or endorsed by the GrapheneOS project.
+     The package name is app.seamlessupdate.client (set in build.gradle.kts): +PLUS replaces GrapheneOS's Updater in
+     the image. Privileged permissions are granted by etc/system/app.seamlessupdate.client.permissions.xml. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The GrapheneOS Updater's permissions. -->
+    <uses-permission android:name="android.permission.ACCESS_CACHE_FILESYSTEM" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ALLOCATE_AGGRESSIVE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.REBOOT" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- +PLUS additions: installing and updating add-ons and itself, scanning the key QR code. -->
+    <uses-permission android:name="android.permission.INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.DELETE_PACKAGES" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <application
+        android:label="+PLUS"
+        android:icon="@mipmap/ic_launcher"
+        android:extractNativeLibs="true"
+        android:allowBackup="false"
+        android:networkSecurityConfig="@xml/network_security_config">
+
+        <activity
+            android:name=".StatusActivity"
+            android:exported="true"
+            android:label="+PLUS">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- GrapheneOS Settings > System > System update opens the updater through these actions. -->
+            <intent-filter>
+                <action android:name="app.seamlessupdate.client.OPEN_SETTINGS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.settings.SYSTEM_UPDATE_SETTINGS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".key.KeyImportActivity"
+            android:exported="false"
+            android:label="Import your key" />
+        <activity
+            android:name=".store.StoreActivity"
+            android:exported="false"
+            android:label="Add-ons" />
+        <!-- T3: "Restart to finish" confirms and activates an installed update. Not exported, never over the lock
+             screen (no showWhenLocked): the owner must unlock the phone first. -->
+        <activity
+            android:name=".update.RestartActivity"
+            android:exported="false"
+            android:label="Restart to finish" />
+        <service
+            android:name=".update.BuildService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Rebuilds and signs the OS update on the phone" />
+        </service>
+        <service
+            android:name=".update.UpdateJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+    </application>
+</manifest>

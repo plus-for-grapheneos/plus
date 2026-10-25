@@ -1,0 +1,19 @@
+*.key
+*.jks
+*.pem.private
+work/
+build/
+.gradle/
+.superpowers/
+.idea/
+local.properties
+*.iml
+app/src/main/jniLibs/arm64-v8a/libavbroot.so
+app/src/main/jniLibs/arm64-v8a/libafsr.so
+tools/bin/
+.kotlin/
+
+# web-setup binary assets (fetch-assets.sh)
+web-setup/tools/
+web-setup/assets/plus/
+web-setup/node_modules/

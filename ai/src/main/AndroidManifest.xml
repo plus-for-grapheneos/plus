@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- +PLUS AI: on-device language models for other apps. Not affiliated with or endorsed by the GrapheneOS project. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Apps that may use the models. "dangerous" = a runtime permission: Android asks the owner per app. -->
+    <permission
+        android:name="app.plusos.ai.permission.USE_AI"
+        android:label="@string/perm_label"
+        android:description="@string/perm_description"
+        android:protectionLevel="dangerous" />
+
+    <!-- Model downloads only (GrapheneOS's Network toggle can stay off otherwise). -->
+    <!-- "Apps that may use +PLUS AI" lists the apps known to ask (Android hides other packages otherwise). -->
+    <queries>
+        <package android:name="app.plusos.phone" />
+    </queries>
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:label="+PLUS AI"
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:extractNativeLibs="true"
+        android:networkSecurityConfig="@xml/network_security_config">
+
+        <!-- GPU inference through OpenCL (public library on Pixel); CPU works without. -->
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL-pixel.so" android:required="false" />
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
+
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".AiService"
+            android:exported="true"
+            android:permission="app.plusos.ai.permission.USE_AI"
+            android:foregroundServiceType="specialUse">
+            <intent-filter>
+                <action android:name="app.plusos.ai.BIND" />
+            </intent-filter>
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Runs an on-device language model for apps the owner allowed" />
+        </service>
+
+        <!-- Model downloads keep running with the screen off. -->
+        <service
+            android:name=".DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+    </application>
+</manifest>

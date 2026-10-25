@@ -1,0 +1,8 @@
+#!/system/bin/sh
+# avbroot signing helper: forwards one signing request to +PLUS and returns the raw signature.
+# +PLUS answers with <id>.resp, or with <id>.err when the request can't be signed (the build then stops).
+d="${PLUS_SIGN_DIR:?}"; id="$$-$(date +%s%N)"
+{ printf '%s\n' "$1"; cat; } > "$d/$id.req.part" && mv "$d/$id.req.part" "$d/$id.req"
+while [ ! -f "$d/$id.resp" ] && [ ! -f "$d/$id.err" ]; do sleep 0.2; done
+if [ -f "$d/$id.err" ]; then cat "$d/$id.err" >&2; rm -f "$d/$id.err" "$d/$id.req"; exit 1; fi
+cat "$d/$id.resp"; rm -f "$d/$id.resp" "$d/$id.req"
