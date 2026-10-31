@@ -22,6 +22,11 @@
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- "Your own app" add-ons read the installed copy of the apps +PLUS can make system apps (core OwnAppPolicy). -->
+    <queries>
+        <package android:name="com.google.android.dialer" />
+    </queries>
+
     <application
         android:label="+PLUS"
         android:icon="@mipmap/ic_launcher"

@@ -137,6 +137,65 @@ class PipelineTest {
         assertTrue(fake.systemToml.contains("path = \"/system/priv-app/Updater/lib\"\n"))
     }
 
+    private val ownEntry = app.plusos.core.OwnApp.Entry(
+        id = "google-phone", name = "Google Phone", packageName = "com.google.android.dialer", version = 5,
+        signerSha256 = "e2", paths = listOf("product/priv-app/GooglePhone/base.apk", "product/priv-app/GooglePhone/split_config.arm64_v8a.apk"),
+        grants = listOf("android.permission.MODIFY_PHONE_STATE"), denies = listOf("android.permission.WRITE_SECURE_SETTINGS"),
+        dynamicCode = true, powerAllowlist = true,
+    )
+
+    private fun ownAppFiles(): AddedFiles {
+        val split = File(root, "split_config.arm64_v8a.apk")
+        java.util.zip.ZipOutputStream(split.outputStream()).use { z ->
+            z.putNextEntry(java.util.zip.ZipEntry("lib/arm64-v8a/libdialer.so")); z.write("elf".toByteArray()); z.closeEntry()
+        }
+        return files.copy(
+            ownAppApks = mapOf(ownEntry.paths[0] to fakeApk("base.apk", "google"), ownEntry.paths[1] to split),
+            dynamicCodeOverlay = fakeApk("overlay.apk", "overlay"),
+        )
+    }
+
+    /** "Your own app": the owner's installed copy goes in unchanged, with grants, denies, overlay and sysconfig. */
+    @Test
+    fun own_apps_are_copied_unchanged_with_their_permission_files() {
+        val f = ownAppFiles()
+        pipeline().run(ota, manifest().copy(ownApps = listOf(ownEntry)), f, signer, out)
+        val product = File(work, "product.tree.snapshot")
+        assertArrayEquals(f.ownAppApks.getValue(ownEntry.paths[0]).readBytes(), File(product, "priv-app/GooglePhone/base.apk").readBytes())
+        assertArrayEquals(f.ownAppApks.getValue(ownEntry.paths[1]).readBytes(), File(product, "priv-app/GooglePhone/split_config.arm64_v8a.apk").readBytes())
+        assertEquals("elf", File(product, "priv-app/GooglePhone/lib/arm64/libdialer.so").readText())
+        val privapp = File(product, "etc/permissions/privapp-permissions-plus.xml").readText()
+        assertTrue(privapp.contains("<privapp-permissions package=\"com.google.android.dialer\">\n        <permission name=\"android.permission.MODIFY_PHONE_STATE\"/>\n        <deny-permission name=\"android.permission.WRITE_SECURE_SETTINGS\"/>"), privapp)
+        assertTrue(privapp.contains("app.plusos.phone"), "add-on grants stay")
+        assertArrayEquals(f.dynamicCodeOverlay!!.readBytes(), File(product, "overlay/PlusDynamicCode/PlusDynamicCode.apk").readBytes())
+        assertTrue(File(product, "etc/sysconfig/plus-own-apps.xml").readText().contains("<allow-in-power-save package=\"com.google.android.dialer\"/>"))
+        for (p in listOf("/priv-app/GooglePhone/base.apk", "/priv-app/GooglePhone/split_config.arm64_v8a.apk",
+                "/overlay/PlusDynamicCode/PlusDynamicCode.apk", "/etc/sysconfig/plus-own-apps.xml")) {
+            assertTrue(fake.productToml.contains("path = \"$p\""), p)
+        }
+    }
+
+    @Test
+    fun no_overlay_or_sysconfig_without_an_own_app_that_needs_them() {
+        pipeline().run(ota, manifest(), files.copy(dynamicCodeOverlay = fakeApk("overlay.apk", "overlay")), signer, out)
+        val product = File(work, "product.tree.snapshot")
+        assertFalse(File(product, "overlay/PlusDynamicCode/PlusDynamicCode.apk").exists())
+        assertFalse(File(product, "etc/sysconfig/plus-own-apps.xml").exists())
+    }
+
+    @Test
+    fun an_own_app_whose_files_are_missing_stops_the_build() {
+        val f = ownAppFiles().let { it.copy(ownAppApks = it.ownAppApks - ownEntry.paths[1]) }
+        assertThrows<PipelineException> { pipeline().run(ota, manifest().copy(ownApps = listOf(ownEntry)), f, signer, out) }
+        assertFalse(out.exists())
+    }
+
+    @Test
+    fun an_own_app_needing_the_overlay_without_one_stops_the_build() {
+        val f = ownAppFiles().copy(dynamicCodeOverlay = null)
+        assertThrows<PipelineException> { pipeline().run(ota, manifest().copy(ownApps = listOf(ownEntry)), f, signer, out) }
+    }
+
     /** +PLUS learns what its running image contains from this file (UpdateDecision needs it after every update). */
     @Test
     fun manifest_is_written_into_product() {

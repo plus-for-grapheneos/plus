@@ -8,6 +8,7 @@ import android.util.Log
 import app.plusos.app.UpdateEngineClient
 import app.plusos.app.key.KeyService
 import app.plusos.app.key.SignBroker
+import app.plusos.app.store.OwnApps
 import app.plusos.app.store.RepoClient
 import app.plusos.core.AddonPlan
 import app.plusos.core.AvbKey
@@ -17,6 +18,7 @@ import app.plusos.core.Downloader
 import app.plusos.core.GrapheneRelease
 import app.plusos.core.InstallerCheck
 import app.plusos.core.OwnerCert
+import app.plusos.core.OwnApp
 import app.plusos.core.OwnerKey
 import app.plusos.core.UpdateCheck
 import app.plusos.core.UpdateDecision
@@ -102,6 +104,7 @@ class BuildRunner(private val ctx: Context, private val progress: (String) -> Un
         val plan = AddonPlan.plan(index, repo.selected, updateState.removed, installerVersion, image)
         val fetched = AddonPlan.fetch(plan, download = { repo.download(it, apkDir) }, imageFile = { path -> File("/$path") })
         warnings += fetched.warnings
+        val ownPlans = ownApps(index, installerVersion, warnings)
         warnings.forEach { log("warning: $it") }
         val manifest = BuildManifest(
             device = channel.device,
@@ -109,7 +112,11 @@ class BuildRunner(private val ctx: Context, private val progress: (String) -> Un
             ownerKeyFingerprint = ownerFingerprint(),
             installer = BuildManifest.Installer(installerVersion, sha256(installerApk)),
             addons = fetched.addons(),
+            ownApps = ownPlans.map { p -> p.entry.copy(sha256 = p.entry.paths.map { sha256(p.files.getValue(it)) }) },
         )
+        val overlay = if (manifest.ownApps.any { it.dynamicCode }) File(work, "PlusDynamicCode.apk").also { f ->
+            ctx.assets.open(DYNAMIC_CODE_OVERLAY_ASSET).use { input -> f.outputStream().use { input.copyTo(it) } }
+        } else null
 
         val signDir = File(work, "sign").apply { deleteRecursively(); mkdirs() }
         val signer = if (dev?.throwawayKey == true) throwawaySigner() else helperSigner(signDir)
@@ -129,7 +136,8 @@ class BuildRunner(private val ctx: Context, private val progress: (String) -> Un
                 options = Pipeline.Options(dev?.inputAvbPkmd ?: channel.inputAvbPkmd(work), dev?.inputCert ?: channel.inputCert(work),
                     dev?.allowMissingUpdater ?: channel.allowMissingUpdater),
                 log = { log(it) },
-            ).run(ota, manifest, AddedFiles(installerApk, xmls, fetched.files), signer, out)
+            ).run(ota, manifest, AddedFiles(installerApk, xmls, fetched.files, ownPlans.flatMap { it.files.entries }.associate { it.key to it.value },
+                overlay), signer, out)
         } catch (e: PipelineException) {
             // Review C3: a download that doesn't verify is fetched again next time, not reused forever.
             if (e.stage == Stage.VERIFY_INPUT && dev == null) { ota.delete(); log("the GrapheneOS download did not verify; removed it") }
@@ -142,6 +150,22 @@ class BuildRunner(private val ctx: Context, private val progress: (String) -> Un
         updateState.savePending(manifest) // T3: what "Restart to finish" lists before the owner activates it
         log("build finished in ${(System.currentTimeMillis() - started) / 1000} s: $out (${out.length() / 1_000_000} MB)")
         return Result(out, warnings)
+    }
+
+    /**
+     * "Your own app" add-ons the owner chose ([OwnApp]): each from the app installed on this phone, checked against its
+     * recipe and +PLUS's built-in limits. One that can't be used this time is left out with a warning; the image then
+     * has it as a normal app again (it stays installed). Recipes come from the verified catalog, else its last copy.
+     */
+    private fun ownApps(index: app.plusos.core.RepoIndex?, installerVersion: Int, warnings: MutableList<String>): List<OwnApp.Plan> {
+        val own = OwnApps(ctx)
+        if (index != null) own.saved = index.recipes
+        return OwnApp.chosen(index?.recipes, own.saved, own.selected, installerVersion).mapNotNull { r ->
+            runCatching {
+                val app = own.installed(r.packageName) ?: throw OwnApp.Refused("not installed; install it from Play first")
+                OwnApp.plan(r, app).also { log("own app ${r.name} ${it.entry.version}: ${it.entry.grants.size} permissions granted, ${it.entry.denies.size} denied") }
+            }.onFailure { warnings += "${r.name}: ${it.message}; left out this time" }.getOrNull()
+        }
     }
 
     /** Hands [zip] to update_engine; [onDone] gets true when the update is ready for a restart. */
@@ -201,6 +225,8 @@ class BuildRunner(private val ctx: Context, private val progress: (String) -> Un
     private fun appendLog(s: String) = synchronized(logFile) { logFile.appendText(s + "\n") }
 
     companion object {
+        const val DYNAMIC_CODE_OVERLAY_ASSET = "overlay/PlusDynamicCode.apk"
+
         fun sha256(f: File): String = hex(MessageDigest.getInstance("SHA-256").let { md ->
             f.inputStream().use { input ->
                 val buf = ByteArray(1 shl 20)

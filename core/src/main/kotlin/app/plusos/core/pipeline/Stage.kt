@@ -28,13 +28,16 @@ sealed interface SignerConfig {
 }
 
 /**
- * The files a build adds. Keys of [installerXmls] and [addonApks] are image paths as in the build manifest:
- * `system/...` (inside the system partition's `/system`) or `product/...`.
+ * The files a build adds. Keys of [installerXmls], [addonApks] and [ownAppApks] are image paths as in the build manifest:
+ * `system/...` (inside the system partition's `/system`) or `product/...`. [ownAppApks]: the owner's installed apps,
+ * copied unchanged; [dynamicCodeOverlay]: +PLUS's overlay, used only when an own app needs it.
  */
 data class AddedFiles(
     val installerApk: File,
     val installerXmls: Map<String, File>,
     val addonApks: Map<String, File>,
+    val ownAppApks: Map<String, File> = emptyMap(),
+    val dynamicCodeOverlay: File? = null,
 )
 
 data class PipelineResult(val output: File)

@@ -3,6 +3,8 @@
 package app.plusos.core
 
 import java.time.Instant
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -21,6 +23,9 @@ data class RepoIndex(
     val apps: List<RepoApp>,
     @SerialName("public_key") val publicKey: String = "",
     val expires: String = "",
+    /** "Your own app" recipes ([OwnAppRecipe]): facts about apps the owner installs themselves; never the apps. */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val recipes: List<OwnAppRecipe> = emptyList(),
 ) {
     fun toJson(): String = JSON.encodeToString(serializer(), this)
 

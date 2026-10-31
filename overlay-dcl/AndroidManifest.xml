@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later
+     Static overlay on the framework: lifts GrapheneOS's dynamic-code-loading restriction for the system apps +PLUS makes
+     from the owner's own apps (core: DynamicCodeOverlay). Placed in /product/overlay only when such an app is chosen. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="app.plusos.overlay.dcl"
+    android:versionCode="1" android:versionName="1">
+    <overlay android:targetPackage="android" android:isStatic="true" android:priority="10" />
+    <application android:hasCode="false" />
+</manifest>

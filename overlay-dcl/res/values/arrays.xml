@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later
+     An overlay replaces a whole array: GrapheneOS's own entries (core/res/res/values/config_ext.xml, 2026101600) come
+     first. Keep in step with core DynamicCodeOverlay (OwnAppTest checks it). -->
+<resources>
+    <string-array name="system_pkgs_allowed_memory_dyn_code_loading_by_default" translatable="false">
+        <item>app.vanadium.browser</item>
+        <item>org.chromium.chrome</item>
+        <item>com.google.android.dialer</item>
+    </string-array>
+    <string-array name="system_pkgs_allowed_storage_dyn_code_loading_by_default" translatable="false">
+        <item>com.google.android.dialer</item>
+    </string-array>
+</resources>

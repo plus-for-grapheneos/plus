@@ -17,7 +17,7 @@ class Publisher(private val apkInfo: (File) -> ApkInfo) {
     data class ApkInfo(val packageName: String, val versionCode: Int, val signerSha256: String, val debuggable: Boolean = false)
 
     @Serializable
-    data class Draft(val repo: String, val apps: List<DraftApp>) {
+    data class Draft(val repo: String, val apps: List<DraftApp>, val recipes: List<OwnAppRecipe> = emptyList()) {
         companion object {
             fun fromJson(s: String): Draft = DRAFT_JSON.decodeFromString(serializer(), s)
         }
@@ -50,9 +50,15 @@ class Publisher(private val apkInfo: (File) -> ApkInfo) {
                 privappPermissions = d.privappPermissions, minInstaller = d.minInstaller,
             )
         }
+        // A recipe +PLUS would refuse on every phone is a publishing mistake: catch it here (same rules as OwnApp.plan).
+        for (r in draft.recipes) {
+            val policy = requireNotNull(OwnAppPolicy.ALL[r.packageName]) { "recipe ${r.id}: +PLUS can't make ${r.packageName} a system app" }
+            require(policy.signers.containsAll(r.signers.map { it.lowercase() })) { "recipe ${r.id}: a signer +PLUS doesn't accept" }
+            require(policy.maxGrant.containsAll(r.grant)) { "recipe ${r.id}: grants beyond +PLUS's limit: ${r.grant - policy.maxGrant}" }
+        }
         val expires = java.time.Instant.parse(published).plus(java.time.Duration.ofDays(validDays)).toString()
         val index = RepoIndex(repo = draft.repo, published = published, serial = previous + 1, apps = apps,
-            publicKey = SignedCatalog.encodedKey(key), expires = expires)
+            publicKey = SignedCatalog.encodedKey(key), expires = expires, recipes = draft.recipes)
         val bytes = index.toJson().toByteArray()
         File(site, "index.json").writeBytes(bytes)
         File(site, "index.json.sig").writeBytes(SignedCatalog.sign(bytes, key))

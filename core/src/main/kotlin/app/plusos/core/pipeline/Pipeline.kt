@@ -3,6 +3,8 @@
 package app.plusos.core.pipeline
 
 import app.plusos.core.BuildManifest
+import app.plusos.core.DynamicCodeOverlay
+import app.plusos.core.OwnApp
 import app.plusos.core.Pins
 import app.plusos.core.PrivappXml
 import java.io.File
@@ -147,15 +149,50 @@ class Pipeline(
             productNew += FsEdit.FsEntry("/$rel", dir = false)
             if (rel.endsWith(".apk")) productNew += unpackNativeLibs(dest, "/" + rel.substringBeforeLast('/'))
         }
-        val grants = manifest.addons.flatMap { it.privappPermissions.entries }
-            .groupBy({ it.key }, { it.value }).mapValues { (_, v) -> v.flatten().distinct() }
-        if (grants.isNotEmpty()) {
-            File(product, PRIVAPP_XML).apply { parentFile.mkdirs() }.writeText(PrivappXml.generate(grants))
+        productNew += editOwnApps(manifest, files, product)
+        val grants = (manifest.addons.flatMap { it.privappPermissions.entries }.map { it.key to it.value } +
+            manifest.ownApps.map { it.packageName to it.grants })
+            .groupBy({ it.first }, { it.second }).mapValues { (_, v) -> v.flatten().distinct() }
+        val denies = manifest.ownApps.associate { it.packageName to it.denies }.filterValues { it.isNotEmpty() }
+        if (grants.isNotEmpty() || denies.isNotEmpty()) {
+            File(product, PRIVAPP_XML).apply { parentFile.mkdirs() }.writeText(PrivappXml.generate(grants, denies))
             productNew += FsEdit.FsEntry("/$PRIVAPP_XML", dir = false)
         }
         File(product, MANIFEST).apply { parentFile.mkdirs() }.writeText(manifest.toJson())
         productNew += FsEdit.FsEntry("/$MANIFEST", dir = false)
         f("product.fs.toml").writeText(FsEdit.addEntries(f("product.fs.toml").readText(), productNew))
+    }
+
+    /**
+     * "Your own app" add-ons ([OwnApp]): the owner's installed APKs, unchanged, into product/priv-app; the overlay lifting
+     * the code-loading restriction when one needs it; the power allowlist. A listed file that is missing stops the build:
+     * an app with some of its split APKs missing would not start.
+     */
+    private fun editOwnApps(manifest: BuildManifest, files: AddedFiles, product: File): List<FsEdit.FsEntry> {
+        val entries = mutableListOf<FsEdit.FsEntry>()
+        for (app in manifest.ownApps) {
+            for (path in app.paths) {
+                require(path.startsWith("product/priv-app/")) { "own apps go to product/priv-app/, got $path" }
+                val src = files.ownAppApks[path]
+                    ?: throw PipelineException(Stage.EDIT, PipelineException.Reason.BAD_INPUT, "${app.name}: $path is missing")
+                val rel = path.removePrefix("product/")
+                val dest = File(product, rel).apply { parentFile.mkdirs() }.also { src.copyTo(it, overwrite = true) }
+                entries += FsEdit.FsEntry("/$rel", dir = false)
+                entries += unpackNativeLibs(dest, "/" + rel.substringBeforeLast('/'))
+            }
+        }
+        if (manifest.ownApps.any { it.dynamicCode }) {
+            val overlay = files.dynamicCodeOverlay
+                ?: throw PipelineException(Stage.EDIT, PipelineException.Reason.BAD_INPUT, "the code-loading overlay is missing")
+            val rel = DynamicCodeOverlay.IMAGE_PATH.removePrefix("product/")
+            overlay.copyTo(File(product, rel).apply { parentFile.mkdirs() }, overwrite = true)
+            entries += FsEdit.FsEntry("/$rel", dir = false)
+        }
+        OwnApp.sysconfigXml(manifest.ownApps)?.let { xml ->
+            File(product, OwnApp.SYSCONFIG_XML).apply { parentFile.mkdirs() }.writeText(xml)
+            entries += FsEdit.FsEntry("/${OwnApp.SYSCONFIG_XML}", dir = false)
+        }
+        return entries
     }
 
     /**

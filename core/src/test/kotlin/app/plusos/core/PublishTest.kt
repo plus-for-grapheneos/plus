@@ -62,4 +62,28 @@ class PublishTest {
         assertEquals("https://example.org/plus/index.json#sha256=" + CatalogLink.keySha256(key.public.encoded), link)
         assertEquals(CatalogLink.keySha256(key.public.encoded), CatalogLink.parse(link).keySha256)
     }
+
+    @Test
+    fun recipes_in_the_draft_go_into_the_signed_index_unchanged() {
+        val recipe = OwnAppRecipe(
+            id = "google-phone", name = "Google Phone", packageName = OwnAppPolicy.GOOGLE_PHONE.packageName,
+            signers = OwnAppPolicy.GOOGLE_PHONE.signers.toList(), grant = listOf("android.permission.MODIFY_PHONE_STATE"),
+        )
+        val index = Publisher { f -> info.getValue(f.name) }.publish(draft.copy(recipes = listOf(recipe)), apks, key.private, site, "2026-10-22T00:00:00Z")
+        assertEquals(listOf(recipe), index.recipes)
+        val read = RepoIndexVerifier.verify(File(site, "index.json").readBytes(), File(site, "index.json.sig").readBytes(),
+            CatalogLink.keySha256(CatalogLink.publicKeyOf(key.private).encoded), null, java.time.Instant.parse("2026-10-23T00:00:00Z"))
+        assertEquals(listOf(recipe), read.recipes)
+    }
+
+    @Test
+    fun a_draft_recipe_beyond_plus_limits_is_refused_at_publish() {
+        val greedy = OwnAppRecipe(
+            id = "x", name = "X", packageName = OwnAppPolicy.GOOGLE_PHONE.packageName,
+            signers = OwnAppPolicy.GOOGLE_PHONE.signers.toList(), grant = listOf("android.permission.INSTALL_PACKAGES"),
+        )
+        org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            Publisher { f -> info.getValue(f.name) }.publish(draft.copy(recipes = listOf(greedy)), apks, key.private, site, "2026-10-22T00:00:00Z")
+        }
+    }
 }

@@ -1,0 +1,24 @@
+{
+  "id": "google-phone",
+  "name": "Google Phone",
+  "package": "com.google.android.dialer",
+  "signers": ["e2d049f3a01192f620b1240615fa8c13badc553c22bc6fddfca45c84d8fc545d"],
+  "min_version": 19664958,
+  "grant": [
+    "android.permission.CAPTURE_AUDIO_OUTPUT",
+    "android.permission.MODIFY_AUDIO_ROUTING",
+    "android.permission.MODIFY_PHONE_STATE",
+    "android.permission.CAPTURE_VOICE_COMMUNICATION_OUTPUT",
+    "android.permission.CONTROL_INCALL_EXPERIENCE",
+    "android.permission.READ_PRIVILEGED_PHONE_STATE",
+    "com.android.voicemail.permission.READ_VOICEMAIL",
+    "com.android.voicemail.permission.WRITE_VOICEMAIL",
+    "android.permission.ALLOW_ANY_CODEC_FOR_PLAYBACK",
+    "android.permission.BROADCAST_CLOSE_SYSTEM_DIALOGS",
+    "android.permission.STOP_APP_SWITCHES"
+  ],
+  "dynamic_code": true,
+  "power_allowlist": true,
+  "notice": "Uses the Google Phone you installed from Play. Call Screen, Hold for Me and call recording are offered by Google per country. Call notes, fraud detection and leave a message need Google's on-device AI, which GrapheneOS doesn't include. Set it as your default phone app afterwards (it and Phone+ can't both be the default).",
+  "min_installer": 15
+}

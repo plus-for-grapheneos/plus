@@ -2,6 +2,8 @@
 // Copyright 2026 The +PLUS for GrapheneOS project
 package app.plusos.core
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -15,6 +17,10 @@ data class BuildManifest(
     @SerialName("owner_key_fingerprint") val ownerKeyFingerprint: String,
     val installer: Installer,
     val addons: List<Addon>,
+    /** "Your own app" add-ons: apps from this phone made privileged system apps ([OwnApp]). Left out when empty, so
+     *  manifests without one keep their bytes (the web setup page builds the same JSON). */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @SerialName("own_apps") val ownApps: List<OwnApp.Entry> = emptyList(),
 ) {
     @Serializable
     data class Os(val build: String, @SerialName("ota_sha256") val otaSha256: String)

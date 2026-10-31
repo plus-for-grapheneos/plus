@@ -16,7 +16,7 @@ android {
         applicationId = "app.seamlessupdate.client"
         minSdk = 34
         targetSdk = 34
-        versionCode = 14
+        versionCode = 15
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -31,6 +31,8 @@ android {
 
     // The three system XMLs +PLUS writes over the GrapheneOS Updater's (assets/system/...).
     sourceSets["main"].assets.srcDir("../etc")
+    // The code-loading overlay for "your own app" add-ons (built by tools/build-dcl-overlay.sh from overlay-dcl/).
+    sourceSets["main"].assets.srcDir("src/main/overlay-assets")
 
     buildTypes {
         // Release code (not debuggable) with the development repository and the source-build release channel of
