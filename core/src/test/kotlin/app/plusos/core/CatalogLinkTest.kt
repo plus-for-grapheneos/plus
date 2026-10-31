@@ -5,6 +5,7 @@ package app.plusos.core
 import java.security.KeyPairGenerator
 import java.security.MessageDigest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
@@ -29,10 +30,26 @@ class CatalogLinkTest {
         assertEquals(hash, CatalogLink.parse("  https://example.org/index.json#sha256=${hash.uppercase()} \n").keySha256)
     }
 
+    /** The catalog is signed, so plain http is fine for an IP address (a LAN host has no certificate anyway). */
     @Test
-    fun plain_http_only_where_allowed() {
-        assertThrows<CatalogLink.InvalidLink> { CatalogLink.parse("http://10.0.2.2:8800/index.json#sha256=$hash") }
-        assertEquals("http://10.0.2.2:8800/", CatalogLink.parse("http://10.0.2.2:8800/index.json#sha256=$hash", allowHttp = true).base)
+    fun plain_http_for_an_ip_address_in_every_build() {
+        assertEquals("http://10.0.2.2:8801/", CatalogLink.parse("http://10.0.2.2:8801/index.json#sha256=$hash").base)
+        assertEquals("http://10.0.2.2/", CatalogLink.parse("http://10.0.2.2/index.json#sha256=$hash").base)
+        assertEquals("http://[fd00::1]:8801/", CatalogLink.parse("http://[fd00::1]:8801/index.json#sha256=$hash").base)
+    }
+
+    @Test
+    fun plain_http_for_a_named_host_only_where_allowed() {
+        val e = assertThrows<CatalogLink.InvalidLink> { CatalogLink.parse("http://example.org/index.json#sha256=$hash") }
+        assertTrue("IP address" in e.message!!, e.message)
+        assertEquals("http://example.org/", CatalogLink.parse("http://example.org/index.json#sha256=$hash", allowHttp = true).base)
+    }
+
+    @Test
+    fun names_that_only_look_like_ip_addresses_need_https() {
+        for (host in listOf("203.0.113.999", "1.2.3", "1.2.3.4.example.org", "01x.2.3.4")) {
+            assertThrows<CatalogLink.InvalidLink>(host) { CatalogLink.parse("http://$host/index.json#sha256=$hash") }
+        }
     }
 
     @Test

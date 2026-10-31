@@ -53,4 +53,14 @@ class AddonPlanTest {
         SignerPins(storage).check("app.plusos.phone", "aa")
         assertThrows<SignerPins.SignerMismatch> { SignerPins(storage).check("app.plusos.phone", "bb") }
     }
+
+    /** B3 (owner, 2026-10-29): the store must show a newer +PLUS in the catalog as an update. */
+    @Test
+    fun installer_update_is_the_newest_plus_above_the_running_one() {
+        assertEquals(5, AddonPlan.installerUpdate(index, runningVersion = 4)?.version)
+        assertEquals(null, AddonPlan.installerUpdate(index, runningVersion = 5))
+        assertEquals(null, AddonPlan.installerUpdate(index, runningVersion = 6))
+        val two = index.copy(apps = index.apps + app("app.seamlessupdate.client", "plus", 7))
+        assertEquals(7, AddonPlan.installerUpdate(two, runningVersion = 4)?.version)
+    }
 }

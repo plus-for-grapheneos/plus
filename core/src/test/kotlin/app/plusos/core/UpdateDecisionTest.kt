@@ -62,4 +62,15 @@ class UpdateDecisionTest {
         assertEquals(Decision.ChannelBehind("2026110100"), UpdateDecision.decide(3_000L, release, image, newer, plenty))
         assertEquals(Decision.ChannelBehind("2026110100"), UpdateDecision.decide(3_000L, release, image, image, plenty, manual = true))
     }
+
+    /** Owner, 2026-10-29: back from Beta to Stable is allowed at the same release (Stable has caught up with it). */
+    @Test
+    fun switching_back_to_stable_at_the_same_release_is_allowed() {
+        val runningBeta = GrapheneRelease("2026110100", 2_000L, "tokay", "beta")
+        val stableSame = runningBeta.copy(channel = "stable")
+        val newer = image + ("app.seamlessupdate.client" to 4)
+        assertEquals(Decision.UpToDate, UpdateDecision.decide(runningBeta.buildDateUtc, stableSame, image, image, plenty))
+        assertEquals(Decision.Build(BuildReason.INSTALLER_UPDATE), UpdateDecision.decide(runningBeta.buildDateUtc, stableSame, image, newer, plenty))
+        assertEquals(Decision.Build(BuildReason.MANUAL), UpdateDecision.decide(runningBeta.buildDateUtc, stableSame, image, image, plenty, manual = true))
+    }
 }

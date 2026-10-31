@@ -80,6 +80,10 @@ object AddonPlan {
     fun removals(index: RepoIndex, inImage: Set<String>, chosen: Set<String>): Set<String> =
         index.apps.filter { it.packageName != INSTALLER && it.packageName in inImage }.map { it.addon }.toSet() - chosen
 
+    /** The newest +PLUS in the catalog when it is newer than the running one (B3: the store shows it as an update). */
+    fun installerUpdate(index: RepoIndex, runningVersion: Int): RepoApp? =
+        index.apps.filter { it.packageName == INSTALLER }.maxByOrNull { it.version }?.takeIf { it.version > runningVersion }
+
     /** package → versionCode the next image should contain (for UpdateDecision). */
     fun versions(plan: Plan, installerVersion: Int, index: RepoIndex?): Map<String, Int> {
         val installer = index?.apps?.filter { it.packageName == INSTALLER }?.maxOfOrNull { it.version } ?: 0

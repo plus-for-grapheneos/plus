@@ -55,6 +55,15 @@ class StoreActivity : Activity() {
                         else -> "Up to date"
                     }
                 }
+                // B3: +PLUS itself is part of every image (not an add-on to tick or remove), but its updates show here.
+                val runningPlus = packageManager.getPackageInfo(packageName, 0).longVersionCode.toInt()
+                val plusUpdate = AddonPlan.installerUpdate(index, runningPlus)
+                if (plusUpdate != null) updates = true
+                list.addView(TextView(this).apply {
+                    text = "+PLUS\n" + if (plusUpdate != null) "installed v$runningPlus, update to v${plusUpdate.version} on Update"
+                        else "installed v$runningPlus (up to date)"
+                    setPadding(0, 0, 0, pad / 2)
+                })
                 for ((addon, apps) in index.apps.filter { it.packageName != AddonPlan.INSTALLER }.groupBy { it.addon }) {
                     val version = apps.maxOf { it.version }
                     val installed = apps.all { inImage[it.packageName] != null }

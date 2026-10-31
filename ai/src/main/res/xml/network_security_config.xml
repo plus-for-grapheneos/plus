@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Plain http is allowed only for catalog links whose host is an IP address (core CatalogLink.parse; owner,
+     2026-10-29): catalogs are verified by signature, key hash, expiry and serial, and every APK by its hash. Android
+     can't express "IP addresses only" here, so the check is in the app; every other address it uses is fixed https. -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

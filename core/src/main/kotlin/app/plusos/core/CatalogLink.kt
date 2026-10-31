@@ -35,7 +35,11 @@ data class CatalogLink(val indexUrl: String, val keySha256: String) {
     companion object {
         private val HASH = Regex("[0-9a-f]{64}")
 
-        /** [allowHttp]: development builds only; release builds require https. */
+        /**
+         * Plain http is accepted for an IP address in every build (2026-10-29, owner): the catalog is checked by its
+         * signature, key hash, expiry and serial, and every APK by its hash, so the transport adds no integrity; a LAN
+         * host has no certificate anyway. A named host needs https, unless [allowHttp] (development builds).
+         */
         fun parse(link: String, allowHttp: Boolean = false): CatalogLink {
             val text = link.trim()
             val hashAt = text.indexOf("#sha256=")
@@ -46,7 +50,9 @@ data class CatalogLink(val indexUrl: String, val keySha256: String) {
             val uri = runCatching { URI(url) }.getOrElse { throw InvalidLink("not a web address") }
             when (uri.scheme) {
                 "https" -> {}
-                "http" -> if (!allowHttp) throw InvalidLink("the catalog link must start with https://")
+                "http" -> if (!allowHttp && !isIpAddress(uri.host.orEmpty())) {
+                    throw InvalidLink("plain http:// only works with an IP address; use https:// for a named host")
+                }
                 else -> throw InvalidLink("the catalog link must start with https://")
             }
             if (uri.host.isNullOrEmpty() || uri.rawUserInfo != null || uri.rawQuery != null) throw InvalidLink("not a plain web address")
@@ -54,6 +60,12 @@ data class CatalogLink(val indexUrl: String, val keySha256: String) {
             if (!file.endsWith(".json")) throw InvalidLink("the link must name the catalog file (…/index.json)")
             return CatalogLink(url, hash)
         }
+
+        private val IPV4 = Regex("""(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}""")
+        private val IPV6 = Regex("""\[[0-9A-Fa-f:.]+]""")
+
+        /** An IPv4 address or a bracketed IPv6 address as URI.host gives it; no name lookup. */
+        internal fun isIpAddress(host: String): Boolean = IPV4.matches(host) || (IPV6.matches(host) && host.count { it == ':' } >= 2)
 
         fun keySha256(publicKeyDer: ByteArray): String =
             MessageDigest.getInstance("SHA-256").digest(publicKeyDer).joinToString("") { "%02x".format(it) }

@@ -16,7 +16,7 @@ android {
         applicationId = "app.seamlessupdate.client"
         minSdk = 34
         targetSdk = 34
-        versionCode = 15
+        versionCode = 16
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
