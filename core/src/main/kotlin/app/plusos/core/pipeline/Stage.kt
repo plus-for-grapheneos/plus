@@ -38,6 +38,8 @@ data class AddedFiles(
     val addonApks: Map<String, File>,
     val ownAppApks: Map<String, File> = emptyMap(),
     val dynamicCodeOverlay: File? = null,
+    /** T2 debug root: Magisk for the boot image; must be given exactly when the manifest says debug_root. */
+    val magisk: app.plusos.core.DebugRoot.Magisk? = null,
 )
 
 data class PipelineResult(val output: File)

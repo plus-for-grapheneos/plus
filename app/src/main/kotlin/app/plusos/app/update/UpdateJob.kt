@@ -12,7 +12,11 @@ import android.os.Build
 import android.os.StatFs
 import android.util.Log
 import app.plusos.app.UpdateEngineClient
+import app.plusos.core.AddonNames
+import app.plusos.core.AddonPlan
 import app.plusos.core.Backoff
+import app.plusos.core.PlusStatus
+import app.plusos.core.RepoIndex
 import app.plusos.core.GrapheneRelease
 import app.plusos.core.UpdateCheck
 import app.plusos.core.NetworkPolicy
@@ -36,6 +40,7 @@ class UpdateJob : JobService() {
                 if (params.jobId == JOB_ID) {
                     scheduleAutoBuild(this)
                     if (NetworkPolicy.onUpdateFound(Network.unmetered(this)) == NetworkPolicy.OnUpdateFound.OFFER_UPDATE_NOW) {
+                        UpdateState(this).waitingForWifi = true
                         getSystemService(android.app.NotificationManager::class.java)
                             .notify(BuildService.AVAILABLE_ID, BuildService.availableNote(this))
                     }
@@ -91,7 +96,16 @@ class UpdateJob : JobService() {
         /** package → versionCode of the apps in the running image. */
         fun imageApps(): Map<String, Int> = UpdateState.imageManifest()?.apps().orEmpty()
 
-        fun decide(ctx: Context, manual: Boolean = false): UpdateDecision.Decision {
+        /** The check, also kept as [UpdateState.lastCheck] for the status screen (what was found, or why it failed). */
+        fun decide(ctx: Context, manual: Boolean = false): UpdateDecision.Decision = try {
+            check(ctx, manual)
+        } catch (e: Exception) {
+            UpdateState(ctx).lastCheck = PlusStatus.Check(System.currentTimeMillis(), PlusStatus.CheckKind.CHECK_FAILED,
+                error = e.message ?: e.javaClass.simpleName)
+            throw e
+        }
+
+        private fun check(ctx: Context, manual: Boolean): UpdateDecision.Decision {
             val channel = ReleaseChannel(ctx)
             // +PLUS 11: a model without pinned GrapheneOS keys never builds (and never fetches another model's release).
             UpdateDecision.deviceCheck(channel.device, customChannel = !channel.official)?.let { return it }
@@ -102,7 +116,30 @@ class UpdateJob : JobService() {
                 .onFailure { Log.w(UpdateEngineClient.TAG, "repository unavailable; keeping the image's apps", it) }.getOrNull() else null
             val installerVersion = ctx.packageManager.getPackageInfo(ctx.packageName, 0).longVersionCode.toInt()
             val state = UpdateState(ctx).check(UpdateState.imageManifest(), installerVersion, repo.selected)
-            return UpdateCheck.decide(Build.TIME / 1000, release, state, index, StatFs(ctx.filesDir.path).availableBytes, manual)
+            val free = StatFs(ctx.filesDir.path).availableBytes
+            val decision = UpdateCheck.decide(Build.TIME / 1000, release, state, index, free, manual)
+            UpdateState(ctx).lastCheck = record(decision, release, index, installerVersion, repo.selected, channel.channel, free)
+            return decision
+        }
+
+        /** In plain words for the status screen: which GrapheneOS, +PLUS and add-on versions are new. */
+        private fun record(
+            d: UpdateDecision.Decision, release: GrapheneRelease, index: RepoIndex?, installerVersion: Int,
+            selected: Set<String>, channel: String, free: Long,
+        ): PlusStatus.Check {
+            val now = System.currentTimeMillis()
+            val os = release.build.takeIf { release.isNewerThan(Build.TIME / 1000) }
+            val plus = index?.let { AddonPlan.installerUpdate(it, installerVersion)?.version }
+            val image = imageApps()
+            val addons = index?.let { AddonPlan.wanted(it, selected, installerVersion) }.orEmpty()
+                .filter { (p, v) -> p != AddonPlan.INSTALLER && image[p] != v }
+                .map { (p, v) -> "${AddonNames.pkg(p)} $v" }
+            return when (d) {
+                is UpdateDecision.Decision.Build -> PlusStatus.Check(now, PlusStatus.CheckKind.UPDATE, os, plus, addons)
+                is UpdateDecision.Decision.ChannelBehind -> PlusStatus.Check(now, PlusStatus.CheckKind.CHANNEL_BEHIND, d.build, channel = channel)
+                is UpdateDecision.Decision.WaitForSpace -> PlusStatus.Check(now, PlusStatus.CheckKind.NEEDS_SPACE, os, plus, addons, freeBytes = d.freeBytes)
+                else -> PlusStatus.Check(now, PlusStatus.CheckKind.UP_TO_DATE)
+            }
         }
     }
 }

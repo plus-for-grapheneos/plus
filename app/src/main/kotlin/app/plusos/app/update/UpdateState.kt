@@ -32,6 +32,25 @@ class UpdateState(private val ctx: Context) {
 
     val lastFailureMs: Long get() = prefs.getLong("last_failure", 0)
 
+    /** What the last update check found (the status screen's "available" line). */
+    var lastCheck: app.plusos.core.PlusStatus.Check?
+        get() = app.plusos.core.PlusStatus.Check.decode(prefs.getString("last_check", null))
+        set(v) { prefs.edit().putString("last_check", v?.encode()).apply() }
+
+    /** An update was found on mobile data, or an automatic build stopped there: it waits for Wi-Fi. */
+    var waitingForWifi: Boolean
+        get() = prefs.getBoolean("waiting_wifi", false)
+        set(v) { prefs.edit().putBoolean("waiting_wifi", v).apply() }
+
+    /** Why the last build failed, and when the retry job is due (null after a success). */
+    var lastError: String?
+        get() = prefs.getString("last_error", null)
+        set(v) { prefs.edit().putString("last_error", v).apply() }
+
+    var retryAtMs: Long?
+        get() = prefs.getLong("retry_at", -1).takeIf { it >= 0 }
+        set(v) { prefs.edit().putLong("retry_at", v ?: -1).apply() }
+
     fun markApplied() { prefs.edit().putLong("applied_at_boot_count", bootCount()).commit() }
 
     /** T3: the manifest of the update that is installed but not yet active (what "Restart to finish" shows). */

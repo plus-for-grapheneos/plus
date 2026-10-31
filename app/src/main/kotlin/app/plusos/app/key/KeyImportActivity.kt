@@ -34,6 +34,8 @@ import kotlin.concurrent.thread
  * First-run key import (spec §2 step 6): scan the QR code plus-setup shows, or paste the backup text from the password
  * manager. Shows the key fingerprint (4 groups of 4) to compare with plus-setup's screen, then imports into the TEE.
  */
+private const val NL = "\n"
+
 class KeyImportActivity : ComponentActivity() {
     private lateinit var status: TextView
     private lateinit var importButton: Button
@@ -41,6 +43,10 @@ class KeyImportActivity : ComponentActivity() {
     private var pending: OwnerKey? = null
     @Volatile private var scanning = true
     private lateinit var catalog: EditText
+    private lateinit var debugRoot: android.widget.CheckBox
+    private val pickMagisk = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        onMagiskPicked(uri)
+    }
     private val analysis = Executors.newSingleThreadExecutor()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,6 +89,12 @@ class KeyImportActivity : ComponentActivity() {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             maxLines = 3
         }
+        // T2: debug root, a development tool. Only this screen turns it on, so it needs the owner's key backup.
+        debugRoot = android.widget.CheckBox(this).apply {
+            text = "Debug root for adb (development only)" + NL + "Root for the adb shell over USB, no app gets it. Weakens " +
+                "GrapheneOS's protections while on; turn it off again when you are done. Needs an official Magisk APK."
+            isChecked = DebugRootState(this@KeyImportActivity).enabled
+        }
         val check = Button(this).apply {
             text = "Check pasted text"
             setOnClickListener { offer(paste.text.toString()); paste.text.clear() }
@@ -92,7 +104,7 @@ class KeyImportActivity : ComponentActivity() {
                 orientation = LinearLayout.VERTICAL
                 setPadding(pad, pad, pad, pad)
                 addView(preview); addView(status); addView(paste); addView(check); addView(levels)
-                addView(catalogLabel); addView(catalog); addView(importButton)
+                addView(catalogLabel); addView(catalog); addView(debugRoot); addView(importButton)
             })
         })
         if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startCamera(preview)
@@ -164,6 +176,7 @@ class KeyImportActivity : ComponentActivity() {
             pending = null // drop the decoded key material (best effort: the JVM may still hold copies)
             if (result == KeyService.ImportResult.OK) app.plusos.app.store.RepoClient.saveLink(this, link)
             runOnUiThread {
+                if (result == KeyService.ImportResult.OK) applyDebugRoot()
                 status.text = when (result) {
                     KeyService.ImportResult.OK -> if (level == KeyService.Level.AUTOMATIC) "Key imported. Updates install automatically."
                         else "Key imported. Each update waits until you unlock the phone once."
@@ -174,6 +187,39 @@ class KeyImportActivity : ComponentActivity() {
                 if (result != KeyService.ImportResult.OK) { scanning = true }
             }
         }
+    }
+
+    /** After a successful import: debug root as the box says. Off rebuilds without root; on needs the owner's Magisk APK. */
+    private fun applyDebugRoot() {
+        val state = DebugRootState(this)
+        val device = app.plusos.app.update.ReleaseChannel(this).device
+        when {
+            debugRoot.isChecked == state.enabled -> {}
+            !debugRoot.isChecked -> { state.end(); status.append(NL + "Debug root off: the next update is built without root.") }
+            state.magisk(device) != null -> turnOnDebugRoot(state)
+            else -> {
+                status.append(NL + "Choose the official Magisk APK (31.0 or newer) to turn on debug root.")
+                pickMagisk.launch(arrayOf("application/vnd.android.package-archive", "application/octet-stream"))
+            }
+        }
+    }
+
+    private fun onMagiskPicked(uri: android.net.Uri?) {
+        if (uri == null) { status.append(NL + "No Magisk APK chosen; debug root stays off."); return }
+        thread {
+            val state = DebugRootState(this)
+            val error = runCatching { contentResolver.openInputStream(uri)!!.let { state.storeMagisk(it) } }.exceptionOrNull()
+            runOnUiThread {
+                if (error != null) status.append(NL + "Debug root stays off: ${error.message}")
+                else turnOnDebugRoot(state)
+            }
+        }
+    }
+
+    private fun turnOnDebugRoot(state: DebugRootState) {
+        state.enabled = true
+        app.plusos.app.update.BuildService.start(this, app.plusos.core.UpdateDecision.BuildReason.MANUAL)
+        status.append(NL + "Debug root on for the next update, which is being built now. Restart to finish it shows it before it takes effect.")
     }
 
     override fun onDestroy() { analysis.shutdown(); super.onDestroy() }

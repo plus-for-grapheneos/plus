@@ -3,6 +3,7 @@
 package app.plusos.core.pipeline
 
 import app.plusos.core.BuildManifest
+import app.plusos.core.DebugRoot
 import app.plusos.core.DynamicCodeOverlay
 import app.plusos.core.OwnApp
 import app.plusos.core.Pins
@@ -49,6 +50,9 @@ class Pipeline(
         val gosAvb = options.inputAvbPkmd ?: File(pins, "grapheneos_avb_pkmd.bin").apply { writeBytes(devicePins!!.avbPkmd) }
         val gosCert = options.inputCert ?: File(pins, "grapheneos_ota.x509.pem").apply { writeBytes(devicePins!!.otaCert.pemBytes()) }
         val part = File(out.path + ".part")
+        if (manifest.debugRoot != (files.magisk != null)) {
+            throw PipelineException(Stage.VERIFY_INPUT, PipelineException.Reason.BAD_INPUT, "debug root and the Magisk input disagree")
+        }
 
         // Review I2: each stage clears its own partial outputs on entry, and deletes the previous stage's files only after
         // its own marker is written, so a kill at any moment leaves a state the next run can resume from.
@@ -98,7 +102,7 @@ class Pipeline(
                 is SignerConfig.Helper -> listOf("--key-avb", "${signer.publicKey}", "--key-ota", "${signer.publicKey}") to signer.env
             }
             val helperArgs = if (signer is SignerConfig.Helper) listOf("--signing-helper", signer.helperPath) else emptyList()
-            tool(Stage.PATCH, av("ota", "patch", "--input", "$ota", "--output", "$part", "--rootless") + keyArgs +
+            tool(Stage.PATCH, av("ota", "patch", "--input", "$ota", "--output", "$part") + DebugRoot.patchArgs(files.magisk) + keyArgs +
                 listOf("--cert-ota", "${signer.cert}") + helperArgs +
                 listOf("--replace", "product", "${f("product.new.img")}", "--replace", "system", "${f("system.new.img")}"), env)
         }

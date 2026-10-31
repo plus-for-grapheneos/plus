@@ -21,6 +21,9 @@ data class BuildManifest(
      *  manifests without one keep their bytes (the web setup page builds the same JSON). */
     @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
     @SerialName("own_apps") val ownApps: List<OwnApp.Entry> = emptyList(),
+    /** T2: the boot image carries Magisk for the adb shell ([DebugRoot]). Left out when off. */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @SerialName("debug_root") val debugRoot: Boolean = false,
 ) {
     @Serializable
     data class Os(val build: String, @SerialName("ota_sha256") val otaSha256: String)

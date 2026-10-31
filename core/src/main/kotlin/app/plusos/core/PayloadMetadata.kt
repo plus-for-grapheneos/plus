@@ -71,6 +71,8 @@ object ChangeList {
         }
         old.addons.filter { o -> new.addons.none { it.id == o.id } }.forEach { out += "${AddonNames.addon(it.id)} removed" }
         out += ownApps(old.ownApps, new.ownApps)
+        if (!old.debugRoot && new.debugRoot) out += "Debug root ON: root for adb shell over USB (development only)"
+        if (old.debugRoot && !new.debugRoot) out += "Debug root off"
         if (old.ownerKeyFingerprint != new.ownerKeyFingerprint) out += "Signed with a different key"
         return out.ifEmpty { listOf("No changes to GrapheneOS or the apps (a rebuild)") }
     }

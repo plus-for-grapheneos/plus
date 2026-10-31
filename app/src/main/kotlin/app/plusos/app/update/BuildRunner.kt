@@ -105,6 +105,11 @@ class BuildRunner(private val ctx: Context, private val progress: (String) -> Un
         val fetched = AddonPlan.fetch(plan, download = { repo.download(it, apkDir) }, imageFile = { path -> File("/$path") })
         warnings += fetched.warnings
         val ownPlans = ownApps(index, installerVersion, warnings)
+        val debug = app.plusos.app.key.DebugRootState(ctx)
+        val magisk = if (debug.enabled) debug.magisk(channel.device).also {
+            if (it == null) warnings += "Debug root: the stored Magisk APK is missing or not acceptable; built without root"
+            else log("debug root: Magisk ${it.apk.length() / 1_000_000} MB, preinit ${it.preinitDevice ?: "not set"}")
+        } else null
         warnings.forEach { log("warning: $it") }
         val manifest = BuildManifest(
             device = channel.device,
@@ -113,6 +118,7 @@ class BuildRunner(private val ctx: Context, private val progress: (String) -> Un
             installer = BuildManifest.Installer(installerVersion, sha256(installerApk)),
             addons = fetched.addons(),
             ownApps = ownPlans.map { p -> p.entry.copy(sha256 = p.entry.paths.map { sha256(p.files.getValue(it)) }) },
+            debugRoot = magisk != null,
         )
         val overlay = if (manifest.ownApps.any { it.dynamicCode }) File(work, "PlusDynamicCode.apk").also { f ->
             ctx.assets.open(DYNAMIC_CODE_OVERLAY_ASSET).use { input -> f.outputStream().use { input.copyTo(it) } }
@@ -137,7 +143,7 @@ class BuildRunner(private val ctx: Context, private val progress: (String) -> Un
                     dev?.allowMissingUpdater ?: channel.allowMissingUpdater),
                 log = { log(it) },
             ).run(ota, manifest, AddedFiles(installerApk, xmls, fetched.files, ownPlans.flatMap { it.files.entries }.associate { it.key to it.value },
-                overlay), signer, out)
+                overlay, magisk), signer, out)
         } catch (e: PipelineException) {
             // Review C3: a download that doesn't verify is fetched again next time, not reused forever.
             if (e.stage == Stage.VERIFY_INPUT && dev == null) { ota.delete(); log("the GrapheneOS download did not verify; removed it") }

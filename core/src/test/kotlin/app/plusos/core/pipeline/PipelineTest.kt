@@ -196,6 +196,24 @@ class PipelineTest {
         assertThrows<PipelineException> { pipeline().run(ota, manifest().copy(ownApps = listOf(ownEntry)), f, signer, out) }
     }
 
+    /** T2: debug root swaps --rootless for Magisk in the patch step; the manifest and the input must agree. */
+    @Test
+    fun debug_root_patches_with_magisk() {
+        val magisk = app.plusos.core.DebugRoot.Magisk(File(root, "magisk.apk").apply { writeText("m") }, null)
+        pipeline().run(ota, manifest().copy(debugRoot = true), files.copy(magisk = magisk), signer, out)
+        val patch = fake.calls.single { it.getOrNull(2) == "patch" }.joinToString(" ")
+        assertTrue(patch.contains("--magisk ${magisk.apk} --ignore-magisk-warnings"), patch)
+        assertFalse(patch.contains("--rootless"), patch)
+    }
+
+    @Test
+    fun debug_root_without_magisk_or_magisk_without_debug_root_is_refused() {
+        val magisk = app.plusos.core.DebugRoot.Magisk(File(root, "magisk.apk").apply { writeText("m") }, null)
+        assertThrows<PipelineException> { pipeline().run(ota, manifest().copy(debugRoot = true), files, signer, out) }
+        assertThrows<PipelineException> { pipeline().run(ota, manifest(), files.copy(magisk = magisk), signer, out) }
+        assertTrue(fake.calls.none { it.getOrNull(2) == "patch" })
+    }
+
     /** +PLUS learns what its running image contains from this file (UpdateDecision needs it after every update). */
     @Test
     fun manifest_is_written_into_product() {

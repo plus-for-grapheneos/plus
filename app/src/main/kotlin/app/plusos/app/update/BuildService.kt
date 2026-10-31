@@ -45,6 +45,9 @@ class BuildService : Service() {
             return START_NOT_STICKY
         }
         running = true
+        Live.running = true
+        Live.step = null
+        state.waitingForWifi = false
         val reason = UpdateDecision.BuildReason.valueOf(intent.getStringExtra(EXTRA_REASON) ?: "MANUAL")
         val automatic = intent.getBooleanExtra(EXTRA_AUTOMATIC, false)
         notifications().cancel(AVAILABLE_ID)
@@ -52,14 +55,15 @@ class BuildService : Service() {
         startForeground(NOTIFICATION_ID, note("Preparing the update…", ongoing = true), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         thread(name = "plus-build") {
             // A late progress callback (update_engine reports after the result) must not re-post the progress note.
-            val runner = BuildRunner(this) { msg -> if (running) notifications().notify(NOTIFICATION_ID, note(msg, ongoing = true)) }
+            val runner = BuildRunner(this) { msg -> if (running) { Live.step = msg; notifications().notify(NOTIFICATION_ID, note(msg, ongoing = true)) } }
             try {
                 val result = runner.run(reason, dev, automatic)
                 if (dev != null && !dev.install) {
                     finish("Test build finished (not installed): ${result.output.name}")
                 } else {
                     runner.install(result.output) { ok ->
-                        if (ok) { state.markApplied(); state.failures = 0 } else failed(state)
+                        if (ok) { state.markApplied(); state.failures = 0; state.lastError = null; state.retryAtMs = null }
+                        else failed(state, "update_engine could not install it")
                         finish(if (ok) null else "The update could not be installed. Share the log from +PLUS.", result.warnings)
                     }
                 }
@@ -67,7 +71,9 @@ class BuildService : Service() {
                 // Not a failure: the automatic build waits for Wi-Fi; the owner can still choose Update now.
                 File(filesDir, "build.log").appendText("STOPPED: ${e.message}\n")
                 UpdateJob.scheduleAutoBuild(this)
+                state.waitingForWifi = true
                 running = false
+                Live.running = false
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 notifications().cancel(NOTIFICATION_ID)
                 notifications().notify(AVAILABLE_ID, availableNote(this))
@@ -75,7 +81,7 @@ class BuildService : Service() {
             } catch (e: Exception) {
                 Log.e(UpdateEngineClient.TAG, "build failed", e)
                 File(filesDir, "build.log").appendText("FAILED: $e\n")
-                if (dev == null) failed(state)
+                if (dev == null) failed(state, e.message ?: e.toString())
                 finish("The update could not be prepared: ${e.message}")
             }
         }
@@ -83,14 +89,17 @@ class BuildService : Service() {
     }
 
     /** Review I8: retry on the backoff schedule. */
-    private fun failed(state: UpdateState) {
+    private fun failed(state: UpdateState, why: String) {
         state.failures = state.failures + 1
+        state.lastError = why
+        state.retryAtMs = System.currentTimeMillis() + app.plusos.core.Backoff.minutesAfterFailure(state.failures) * 60_000L
         UpdateJob.scheduleRetry(this, state.failures)
     }
 
     /** null message = success: offer the restart. [warnings] (add-ons not fetched this time) are shown with it. */
     private fun finish(error: String?, warnings: List<String> = emptyList()) {
         running = false
+        Live.running = false
         stopForeground(STOP_FOREGROUND_REMOVE)
         notifications().cancel(NOTIFICATION_ID)
         val n = if (error == null) {
@@ -137,6 +146,12 @@ class BuildService : Service() {
             throwawayKey = i.getBooleanExtra("dev_throwaway_key", false),
             install = i.getBooleanExtra("dev_install", false),
         )
+    }
+
+    /** The running build as the status screen sees it (same process). */
+    object Live {
+        @Volatile var running = false
+        @Volatile var step: String? = null
     }
 
     companion object {
