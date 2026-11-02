@@ -59,11 +59,20 @@ class DebugRootState(private val ctx: Context) {
 
     fun logText(): String = if (log.exists()) log.readText() else ""
 
+    /** R2: the one-time setup guide opens by itself once per image with debug root (keyed by the image's manifest). */
+    private fun imageKey(): String? = UpdateState.imageManifest()?.takeIf { it.debugRoot }?.let { "${it.grapheneos.otaSha256}:${it.installer.apkSha256}" }
+
+    fun guideDue(): Boolean = imageKey()?.let { it != prefs.getString("guide_shown_for", null) } ?: false
+
+    fun guideShown() { imageKey()?.let { prefs.edit().putString("guide_shown_for", it).apply() } }
+
     /** Shown while the running image has root; its action turns debug root off (no key needed to turn it off). */
     fun updateNotification() {
         val nm = ctx.getSystemService(NotificationManager::class.java)
         if (UpdateState.imageManifest()?.debugRoot != true) { nm.cancel(NOTIFICATION_ID); return }
-        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Debug root", NotificationManager.IMPORTANCE_DEFAULT))
+        // IMPORTANCE_LOW: a persistent status, not an alert. Re-posted on every status-screen refresh, so it must be
+        // silent and alert-once, or it buzzes every few seconds (first phone test, 2026-10-31).
+        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Debug root", NotificationManager.IMPORTANCE_LOW))
         val end = PendingIntent.getBroadcast(ctx, 0, Intent(ctx, EndReceiver::class.java), PendingIntent.FLAG_IMMUTABLE)
         val text = if (enabled) "Root for adb shell over USB (development only). End it to rebuild without root (a few minutes)."
             else "Ending: the next update is built without root. Restart to finish it."
@@ -72,6 +81,9 @@ class DebugRootState(private val ctx: Context) {
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(PendingIntent.getActivity(ctx, 1, Intent(ctx, DebugRootGuideActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE))
             .apply { if (enabled) addAction(Notification.Action.Builder(null, "End debug root", end).build()) }
             .build())
     }

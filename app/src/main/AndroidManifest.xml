@@ -27,6 +27,11 @@
         <package android:name="com.google.android.dialer" />
     </queries>
 
+    <!-- B4: GrapheneOS's setup opens the update app's security preview choice; same permission as the stock Updater. -->
+    <permission
+        android:name="app.seamlessupdate.client.OPEN_SECURITY_PREVIEW_SETTINGS"
+        android:protectionLevel="internal|setup" />
+
     <application
         android:label="+PLUS"
         android:icon="@mipmap/ic_launcher"
@@ -84,5 +89,17 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+        <activity android:name=".key.DebugRootGuideActivity" android:label="Debug root setup" android:exported="false" />
+        <activity android:name=".update.SecurityPreviewActivity"
+            android:label="Security preview releases"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:permission="app.seamlessupdate.client.OPEN_SECURITY_PREVIEW_SETTINGS"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="app.seamlessupdate.client.SECURITY_PREVIEW_SETTINGS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>

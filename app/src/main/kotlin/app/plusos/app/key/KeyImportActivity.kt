@@ -95,6 +95,20 @@ class KeyImportActivity : ComponentActivity() {
                 "GrapheneOS's protections while on; turn it off again when you are done. Needs an official Magisk APK."
             isChecked = DebugRootState(this@KeyImportActivity).enabled
         }
+        // R3: what turning it on involves, on request.
+        val debugRootHelp = TextView(this).apply {
+            val shortText = "What happens (show)"
+            text = shortText
+            setTextColor(0xFF3F5BA9.toInt())
+            setPadding(pad * 2, 0, 0, pad / 2)
+            setOnClickListener {
+                text = if (text == shortText) "You choose an official Magisk APK (31.0 or newer, from Magisk's GitHub " +
+                    "release). The next update adds Magisk to the boot image, signed with your key; the bootloader stays " +
+                    "locked. After the restart +PLUS shows a one-time setup: Magisk installs its app once, you allow " +
+                    "Shell and set Superuser access to ADB only. Then `adb shell /debug_ramdisk/su` has root. While on, " +
+                    "root over USB can read everything on the unlocked phone. End it from the notification." else shortText
+            }
+        }
         val check = Button(this).apply {
             text = "Check pasted text"
             setOnClickListener { offer(paste.text.toString()); paste.text.clear() }
@@ -104,7 +118,7 @@ class KeyImportActivity : ComponentActivity() {
                 orientation = LinearLayout.VERTICAL
                 setPadding(pad, pad, pad, pad)
                 addView(preview); addView(status); addView(paste); addView(check); addView(levels)
-                addView(catalogLabel); addView(catalog); addView(debugRoot); addView(importButton)
+                addView(catalogLabel); addView(catalog); addView(debugRoot); addView(debugRootHelp); addView(importButton)
             })
         })
         if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startCamera(preview)
@@ -195,7 +209,11 @@ class KeyImportActivity : ComponentActivity() {
         val device = app.plusos.app.update.ReleaseChannel(this).device
         when {
             debugRoot.isChecked == state.enabled -> {}
-            !debugRoot.isChecked -> { state.end(); status.append(NL + "Debug root off: the next update is built without root.") }
+            !debugRoot.isChecked -> {
+                state.enabled = false
+                state.updateNotification()
+                offerBuild("Debug root will be removed in the next update.")
+            }
             state.magisk(device) != null -> turnOnDebugRoot(state)
             else -> {
                 status.append(NL + "Choose the official Magisk APK (31.0 or newer) to turn on debug root.")
@@ -218,8 +236,21 @@ class KeyImportActivity : ComponentActivity() {
 
     private fun turnOnDebugRoot(state: DebugRootState) {
         state.enabled = true
-        app.plusos.app.update.BuildService.start(this, app.plusos.core.UpdateDecision.BuildReason.MANUAL)
-        status.append(NL + "Debug root on for the next update, which is being built now. Restart to finish it shows it before it takes effect.")
+        offerBuild("Debug root will be in the next update. Restart to finish shows it before it takes effect.")
+    }
+
+    /** R1 (owner): changing debug root records the choice; the update starts only when the owner says so. */
+    private fun offerBuild(what: String) {
+        status.append(NL + what)
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Build the update now?")
+            .setMessage("$what Build it now, or later with your other changes (Update now on the +PLUS screen, or the next automatic update).")
+            .setPositiveButton("Build now") { _, _ ->
+                app.plusos.app.update.BuildService.start(this, app.plusos.core.UpdateDecision.BuildReason.MANUAL)
+                status.append(NL + "Building the update now.")
+            }
+            .setNegativeButton("Later", null)
+            .show()
     }
 
     override fun onDestroy() { analysis.shutdown(); super.onDestroy() }

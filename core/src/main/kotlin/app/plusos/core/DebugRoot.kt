@@ -29,7 +29,9 @@ object DebugRoot {
      * Magisk's early-boot data partition per phone model (`--magisk-preinit-device`), as recorded by the phone test.
      * Without one avbroot is told to go ahead: Magisk then runs without it, which only matters for modules (off here).
      */
-    val PREINIT: Map<String, String> = emptyMap()
+    val PREINIT: Map<String, String> = mapOf(
+        "tokay" to "metadata", // Pixel 9: `magisk --preinit-device` = sda10 = by-name/metadata (dev phone, 2026-10-31)
+    )
 
     data class Magisk(val apk: File, val preinitDevice: String?)
 

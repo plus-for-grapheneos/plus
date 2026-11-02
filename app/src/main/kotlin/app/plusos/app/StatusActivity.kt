@@ -43,6 +43,8 @@ class StatusActivity : Activity() {
     private lateinit var details: TextView
     private lateinit var message: TextView
     private lateinit var endDebugRoot: Button
+    private lateinit var debugGuide: Button
+    private var guideOpened = false
     @Volatile private var checking = false
     private val updates = android.os.Handler(android.os.Looper.getMainLooper())
     private val dp get() = resources.displayMetrics.density
@@ -103,6 +105,17 @@ class StatusActivity : Activity() {
                 check()
             }
         })
+        root.addView(Button(this).apply {
+            fun label() { text = "Security preview releases: " + (if (releaseChannel.securityPreview) "on" else "off") + " (tap to change)" }
+            label()
+            isEnabled = releaseChannel.official
+            setOnClickListener {
+                // B4: the same choice GrapheneOS's setup offers; switching checks right away.
+                releaseChannel.securityPreview = !releaseChannel.securityPreview
+                label()
+                check()
+            }
+        })
         root.addView(button("Import your key") { startActivity(android.content.Intent(this, app.plusos.app.key.KeyImportActivity::class.java)) })
         endDebugRoot = button("End debug root (rebuild without root)") {
             android.app.AlertDialog.Builder(this).setTitle("End debug root?")
@@ -111,6 +124,10 @@ class StatusActivity : Activity() {
                 .setNegativeButton("Cancel", null).show()
         }.apply { visibility = View.GONE }
         root.addView(endDebugRoot)
+        debugGuide = button("Debug root setup steps") {
+            startActivity(android.content.Intent(this, app.plusos.app.key.DebugRootGuideActivity::class.java))
+        }.apply { visibility = View.GONE }
+        root.addView(debugGuide)
         root.addView(button("Share log") { shareLog() })
         details = TextView(this).apply { setTextIsSelectable(true); visibility = View.GONE; alpha = 0.8f; textSize = 12f }
         root.addView(TextView(this).apply {
@@ -224,9 +241,15 @@ class StatusActivity : Activity() {
         val debug = app.plusos.app.key.DebugRootState(this)
         debug.updateNotification()
         val showEnd = debug.enabled
+        val guideDue = debug.guideDue()
         runOnUiThread {
             if (isFinishing) return@runOnUiThread
             endDebugRoot.visibility = if (showEnd) View.VISIBLE else View.GONE
+            debugGuide.visibility = if (manifest?.debugRoot == true) View.VISIBLE else View.GONE
+            if (guideDue && !guideOpened) {
+                guideOpened = true
+                startActivity(android.content.Intent(this, app.plusos.app.key.DebugRootGuideActivity::class.java))
+            }
             val color = COLORS.getValue(h.phase)
             (card.background as GradientDrawable).setColor(color and 0x00FFFFFF or 0x1F000000)
             dot.background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(color) }

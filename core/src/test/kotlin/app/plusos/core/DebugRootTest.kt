@@ -53,4 +53,9 @@ class DebugRootTest {
         assertTrue("debug_root" in image(true).toJson())
         assertFalse("debug_root" in image(false).toJson())
     }
+
+    @Test
+    fun the_pixel_9_preinit_partition_is_known() {
+        assertEquals("metadata", DebugRoot.PREINIT["tokay"])
+    }
 }

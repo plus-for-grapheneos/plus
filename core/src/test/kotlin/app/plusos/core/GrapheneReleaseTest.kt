@@ -67,4 +67,18 @@ class GrapheneReleaseTest {
         assertTrue(r.isOlderThan(1_792_583_192L))
         assertFalse(r.isOlderThan(1_792_176_552L))
     }
+
+    /** B4: GrapheneOS's security preview releases are the channel name plus "-security-preview", as in its Updater. */
+    @Test
+    fun security_preview_channels_are_named_and_parse_like_the_updater() {
+        assertEquals("stable-security-preview", GrapheneRelease.channelName("stable", securityPreview = true))
+        assertEquals("beta", GrapheneRelease.channelName("beta", securityPreview = false))
+        assertEquals("https://releases.grapheneos.org/tokay-beta-security-preview",
+            GrapheneRelease.metadataUrl(GrapheneRelease.BASE_URL, "beta-security-preview", "tokay"))
+        val r = GrapheneRelease.parse("2026110101 1800000000 tokay stable-security-preview", "stable-security-preview", "tokay")
+        assertEquals("2026110101", r.build)
+        org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            GrapheneRelease.parse("2026110101 1800000000 tokay alpha-security-preview", "alpha-security-preview", "tokay")
+        }
+    }
 }

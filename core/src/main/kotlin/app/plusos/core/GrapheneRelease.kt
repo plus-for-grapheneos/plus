@@ -19,6 +19,16 @@ data class GrapheneRelease(val build: String, val buildDateUtc: Long, val device
         /** GrapheneOS's channels an owner may follow, as in GrapheneOS's own Updater (alpha is for testers). */
         val CHANNELS = listOf("stable", "beta")
 
+        /** B4: security preview releases (early security patches), "<channel>-security-preview", as GrapheneOS's Updater. */
+        const val SECURITY_PREVIEW_SUFFIX = "-security-preview"
+
+        fun channelName(base: String, securityPreview: Boolean): String {
+            require(base in CHANNELS) { "unknown release channel $base" }
+            return if (securityPreview) base + SECURITY_PREVIEW_SUFFIX else base
+        }
+
+        private fun known(channel: String) = channel.removeSuffix(SECURITY_PREVIEW_SUFFIX) in CHANNELS
+
         private val DEVICE_NAME = Regex("[a-z0-9]{2,32}")
 
         /** The release file for [device] (the phone's own model, `Build.DEVICE`) on [channel]. */
@@ -28,7 +38,7 @@ data class GrapheneRelease(val build: String, val buildDateUtc: Long, val device
         }
 
         fun parse(line: String, channel: String, device: String): GrapheneRelease {
-            require(channel in CHANNELS) { "unknown release channel $channel" }
+            require(known(channel)) { "unknown release channel $channel" }
             val f = line.trim().split(' ')
             require(f.size == 4) { "release metadata must have 4 fields, got ${f.size}" }
             require(f[0].matches(Regex("[0-9]{10,12}"))) { "bad build number '${f[0]}'" }

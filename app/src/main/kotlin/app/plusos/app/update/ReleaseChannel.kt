@@ -27,12 +27,26 @@ class ReleaseChannel(private val ctx: Context) {
             else Pins.CHANNEL
         set(v) { require(v in GrapheneRelease.CHANNELS); prefs.edit().putString("release_channel", v).apply() }
 
+    /**
+     * B4: security preview releases ("<channel>-security-preview"), chosen in GrapheneOS's setup or on the +PLUS screen.
+     * Null until chosen (then off, as in GrapheneOS's Updater). Official releases only.
+     */
+    val securityPreviewChoice: Boolean?
+        get() = when (prefs.getInt("security_preview", -1)) { 0 -> false; 1 -> true; else -> null }
+
+    var securityPreview: Boolean
+        get() = official && securityPreviewChoice == true
+        set(v) { prefs.edit().putInt("security_preview", if (v) 1 else 0).apply() }
+
+    /** The release channel actually fetched: the chosen channel, with security previews if on. */
+    val releaseChannel: String get() = if (official) GrapheneRelease.channelName(channel, securityPreview) else channel
+
     /** This phone's model (`Build.DEVICE`, e.g. tokay): its releases and its GrapheneOS keys (+PLUS 11). */
     val device: String = android.os.Build.DEVICE
 
-    val metadataUrl: String get() = GrapheneRelease.metadataUrl(baseUrl, channel, device)
+    val metadataUrl: String get() = GrapheneRelease.metadataUrl(baseUrl, releaseChannel, device)
 
-    fun parse(line: String): GrapheneRelease = GrapheneRelease.parse(line, channel, device)
+    fun parse(line: String): GrapheneRelease = GrapheneRelease.parse(line, releaseChannel, device)
     val official: Boolean get() = baseUrl == GrapheneRelease.BASE_URL
 
     /** Only a source-build channel may lack the Updater app +PLUS replaces; never the official one. */
